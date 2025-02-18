@@ -31,6 +31,8 @@ typedef struct join_queue_entry
 
 // Queues
 static deque<TCB *> ready_queue;
+static deque<join_queue_entry *> join_queue;
+static deque<finished_queue_entry_t> finished_queue;
 
 // Interrupt Management --------------------------------------------------------
 
@@ -114,9 +116,30 @@ int uthread_init(int quantum_usecs)
 	// Create a thread for the caller (main) thread
 }
 
+///* Create a new thread whose entry point is f */
+// Return new thread ID on success, -1 on failure
+// int uthread_create(void *(*start_routine)(void *), void *arg);
+
 int uthread_create(void *(*start_routine)(void *), void *arg)
 {
 	// Create a new thread and add it to the ready queue
+	current_tid = uthread_self()
+	TCB *new_thread = new TCB(TODO, start_routine, arg, READY);
+
+	bool gotcontext = false;
+	for (TCB : ready_queue) {
+		if TCB.getId() == current_tid {
+			new_thread._context.setContext(TCB._context.getContext())
+			gotcontext = true;
+			break;
+		}
+	}
+	if (!gotcontext) {
+		std::cout << "Error: Could not find current thread in ready queue" << std::endl;
+		return -1;
+	}
+	addToReadyQueue(new_thread);
+	return new_thread->getId();
 }
 
 int uthread_join(int tid, void **retval)
