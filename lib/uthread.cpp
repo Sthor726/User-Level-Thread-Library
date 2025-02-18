@@ -31,6 +31,8 @@ typedef struct join_queue_entry
 
 // Queues
 static deque<TCB *> ready_queue;
+static deque<join_queue_entry *> join_queue;
+static deque<finished_queue_entry_t> finished_queue;
 
 // Interrupt Management --------------------------------------------------------
 
@@ -105,6 +107,8 @@ static void switchThreads()
 void stub(void *(*start_routine)(void *), void *arg)
 {
 	// TODO
+	start_routine(arg);
+	uthread_exit(0);
 }
 
 int uthread_init(int quantum_usecs)
@@ -114,16 +118,52 @@ int uthread_init(int quantum_usecs)
 	// Create a thread for the caller (main) thread
 }
 
+///* Create a new thread whose entry point is f */
+// Return new thread ID on success, -1 on failure
+// int uthread_create(void *(*start_routine)(void *), void *arg);
+
 int uthread_create(void *(*start_routine)(void *), void *arg)
 {
 	// Create a new thread and add it to the ready queue
+	int current_tid = uthread_self();
+	TCB *new_thread = new TCB(TODO, start_routine, arg, READY);
+
+	bool gotcontext = false;
+	for (TCB* tcb : ready_queue) {
+		if (tcb->getId() == current_tid) {
+			new_thread->_context.setcontext(tcb->_context.getcontext());
+			gotcontext = true;
+			break;
+		}
+	}
+	if (!gotcontext) {
+		std::cout << "Error: Could not find current thread in ready queue" << std::endl;
+		return -1;
+	}
+	addToReadyQueue(new_thread);
+	return new_thread->getId();
 }
 
 int uthread_join(int tid, void **retval)
 {
 	// If the thread specified by tid is already terminated, just return
+	for(finished_queue_entry entry : finished_queue){
+		if (entry.tcb->getId() == tid) return 0;
+	}
 	// If the thread specified by tid is still running, block until it terminates
+	for(TCB* tcb : ready_queue) {
+		if (tcb->getId() == tid)
+		{
+			uthread_yield();
+		}
+		
+	}
 	// Set *retval to be the result of thread if retval != nullptr
+	if(retval != nullptr){
+		for(finished_queue_entry entry : finished_queue){
+			if (entry.tcb->getId() == tid) *retval = entry.result;
+		}
+	}
 }
 
 int uthread_yield(void)
