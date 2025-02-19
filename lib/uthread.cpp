@@ -1,7 +1,12 @@
+#define _XOPEN_SOURCE 700
 #include "uthread.h"
 #include "TCB.h"
 #include <cassert>
 #include <deque>
+#include <ucontext.h>
+#include <iostream>
+#include <cstdlib>
+
 
 using namespace std;
 
@@ -19,6 +24,11 @@ typedef struct join_queue_entry
 	int waiting_for_tid; // TID this thread is waiting on
 } join_queue_entry_t;
 
+typedef struct runningTCB {
+	int tid;
+	TCB *tcb;
+} runningTCB;
+
 // You will need to maintain structures to track the state of threads
 // - uthread library functions refer to threads by their TID so you will want
 //   to be able to access a TCB given a thread ID
@@ -33,6 +43,8 @@ typedef struct join_queue_entry
 static deque<TCB *> ready_queue;
 static deque<join_queue_entry *> join_queue;
 static deque<finished_queue_entry_t> finished_queue;
+static runningTCB *currentTCB;
+
 
 // Interrupt Management --------------------------------------------------------
 
@@ -95,7 +107,22 @@ int removeFromReadyQueue(int tid)
 // Switch to the next ready thread
 static void switchThreads()
 {
-	// TODO
+	static int currentThread = uthread_self();
+	volatile int flag = 0;
+	int ret_val = getcontext(currentTCB->_context);
+
+	cout << "SWITCH: currentThread = " << currentThread << endl;
+	if (flag == 1) {
+	return;
+	}
+	flag = 1;
+	if(TCB* new_thread = popFromReadyQueue() == NULL){
+		print("no thread available")
+		return;
+	}
+	new_thread->_state = RUNNING;
+	setcontext(new_thread->_context);
+	
 }
 
 // Library functions -----------------------------------------------------------
@@ -113,9 +140,26 @@ void stub(void *(*start_routine)(void *), void *arg)
 
 int uthread_init(int quantum_usecs)
 {
+	// Inside of uthread_init you will want to create an instance of the
+	// TCB class for your main thread. This thread should not create a
+	// new context. How can you best achieve this? Overloaded constructor
+	// that does not take a start routine? Pass in NULL for the start
+	// routine when creating a TCB class
+	// in uthread_init and skip the makecontext call for a null start routine?
+
 	// Initialize any data structures
+	std::deque<TCB *> ready_queue = {};
+	std::deque<join_queue_entry *> join_queue = {};
+	std::deque<finished_queue_entry *> finished_queue = {};
+
 	// Setup timer interrupt and handler
+
+
+
 	// Create a thread for the caller (main) thread
+	TCB *thread;
+	thread->setState(RUNNING);
+
 }
 
 ///* Create a new thread whose entry point is f */
@@ -124,51 +168,55 @@ int uthread_init(int quantum_usecs)
 
 int uthread_create(void *(*start_routine)(void *), void *arg)
 {
+
+	if(start_routine == NULL && arg == NULL){
+		//init thread
+		TCB* init_thread = new TCB(1, GREEN, NULL, NULL, RUNNING);
+		currentTCB->tid = 1;
+		currentTCB->tcb = init_thread;
+
+	}
+
 	// Create a new thread and add it to the ready queue
 	int current_tid = uthread_self();
-	TCB *new_thread = new TCB(TODO, start_routine, arg, READY);
-
-	bool gotcontext = false;
-	for (TCB* tcb : ready_queue) {
-		if (tcb->getId() == current_tid) {
-			new_thread->_context.setcontext(tcb->_context.getcontext());
-			gotcontext = true;
-			break;
-		}
-	}
-	if (!gotcontext) {
-		std::cout << "Error: Could not find current thread in ready queue" << std::endl;
-		return -1;
-	}
+	TCB *new_thread = new TCB(TODO, stub, arg, READY);
 	addToReadyQueue(new_thread);
 	return new_thread->getId();
 }
 
 int uthread_join(int tid, void **retval)
 {
+
+	disableInterrupts();
 	// If the thread specified by tid is already terminated, just return
 	for(finished_queue_entry entry : finished_queue){
 		if (entry.tcb->getId() == tid) return 0;
 	}
-	// If the thread specified by tid is still running, block until it terminates
-	for(TCB* tcb : ready_queue) {
-		if (tcb->getId() == tid)
-		{
-			uthread_yield();
-		}
-		
+
+	TCB* chosenTCB;
+	chosenTCB = popFromReadyQueue();
+	if (chosenTCB == NULL){
+		//spinnnnnnn
+	} else {
+		// start a new thread and block this one 
 	}
+	
 	// Set *retval to be the result of thread if retval != nullptr
 	if(retval != nullptr){
 		for(finished_queue_entry entry : finished_queue){
 			if (entry.tcb->getId() == tid) *retval = entry.result;
 		}
 	}
+	enableInterrupts();
 }
 
 int uthread_yield(void)
 {
-	// TODO
+	// Save context
+	
+	// Set state to READY
+
+	// Start executing next thread ??????
 }
 
 void uthread_exit(void *retval)
@@ -182,11 +230,20 @@ int uthread_suspend(int tid)
 {
 	// Move the thread specified by tid from whatever state it is
 	// in to the block queue
+	
 }
 
 int uthread_resume(int tid)
 {
 	// Move the thread specified by tid back to the ready queue
+	for (TCB* tcb : ready_queue){
+		if (tcb->getId() == tid){
+			// Remove thread from the block queue?????
+			ready_queue.push_back(tcb);
+			tcb->setState(READY);
+		}
+	}
+	
 }
 
 int uthread_once(uthread_once_t *once_control, void (*init_routine)(void))

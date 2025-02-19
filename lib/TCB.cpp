@@ -1,4 +1,6 @@
+#define _XOPEN_SOURCE 700
 #include "TCB.h"
+#include <ucontext.h>
 
 
 // private:
@@ -9,16 +11,20 @@
 // 	char* _stack;           // The thread's stack
 
 
-TCB::TCB(int tid, void *(*start_routine)(void *arg), void *arg, State state)
+TCB::TCB(int tid, Priority pr, void *(*start_routine)(void *arg), void *arg, State state)
 {
     _tid = tid;
-    _start_routine = start_routine;
-    _arg = arg;
+    //_start_routine = start_routine;
+    //_arg = arg;
     _state = state;
     _quantum = 0;
     _stack = new char[STACK_SIZE];
-
-
+    
+    getcontext(&_context);
+    _context.uc_stack.ss_sp = _stack;
+    _context.uc_stack.ss_size = STACK_SIZE;
+    _context.uc_stack.ss_flags = 0;
+    makecontext(&_context, start_routine, arg);
 }
 
 TCB::~TCB()

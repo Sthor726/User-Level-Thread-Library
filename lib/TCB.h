@@ -3,6 +3,7 @@
  */
 #ifndef TCB_H
 #define TCB_H
+#define _XOPEN_SOURCE 700
 
 #include <stdio.h>
 #include <signal.h>

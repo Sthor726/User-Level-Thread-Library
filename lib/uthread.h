@@ -1,5 +1,7 @@
 #ifndef _UTHREADS_H
 #define _UTHREADS_H
+#define _XOPEN_SOURCE 700
+#include <ucontext.h>
 
 /* From IBM OS 3.1.0 -z/OS C/C++ Runtime Library Reference */
 #ifdef _LP64
