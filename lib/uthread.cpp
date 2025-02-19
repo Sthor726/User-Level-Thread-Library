@@ -47,23 +47,29 @@ static runningTCB *currentTCB;
 
 
 // Interrupt Management --------------------------------------------------------
+struct itimerval timer;
+sigset_t mask;
+sigset_t empty_mask;
+void handler(int signum){
+	uthread_yield();
+}
 
 // Start a countdown timer to fire an interrupt
 static void startInterruptTimer()
 {
-	// TODO
+	setitimer(ITIMER_VIRTUAL, &timer, NULL);
 }
 
 // Block signals from firing timer interrupt
 static void disableInterrupts()
 {
-	// TODO
+	sigprocmask(SIG_BLOCK, &mask, nullptr);
 }
 
 // Unblock signals to re-enable timer interrupt
 static void enableInterrupts()
 {
-	// TODO
+	sigprocmask(SIG_SETMASK, &empty_mask, nullptr);
 }
 
 // Queue Management ------------------------------------------------------------
@@ -109,19 +115,20 @@ static void switchThreads()
 {
 	static int currentThread = uthread_self();
 	volatile int flag = 0;
-	int ret_val = getcontext(currentTCB->_context);
+	int ret_val = getcontext(&currentTCB->tcb->_context);
 
 	cout << "SWITCH: currentThread = " << currentThread << endl;
 	if (flag == 1) {
 	return;
 	}
 	flag = 1;
-	if(TCB* new_thread = popFromReadyQueue() == NULL){
-		print("no thread available")
+	TCB* new_thread = popFromReadyQueue();
+	if (new_thread == NULL){
+		std::cout << "no thread available\n";
 		return;
 	}
-	new_thread->_state = RUNNING;
-	setcontext(new_thread->_context);
+	new_thread->setState(RUNNING);
+	setcontext(&new_thread->_context);
 	
 }
 
@@ -153,12 +160,22 @@ int uthread_init(int quantum_usecs)
 	std::deque<finished_queue_entry *> finished_queue = {};
 
 	// Setup timer interrupt and handler
+	timer.it_interval.tv_usec = quantum_usecs;
+	timer.it_value.tv_usec = quantum_usecs;
+	signal(SIGALRM, handler);
+	startInterruptTimer();
 
-
+	sigemptyset(&mask);
+	sigemptyset(&empty_mask);
+	sigaddset(&mask, SIGALRM);
 
 	// Create a thread for the caller (main) thread
 	TCB *thread;
+	currentTCB->tid = 1;
+	currentTCB->tcb = thread;
 	thread->setState(RUNNING);
+
+	return 0;
 
 }
 
@@ -169,17 +186,9 @@ int uthread_init(int quantum_usecs)
 int uthread_create(void *(*start_routine)(void *), void *arg)
 {
 
-	if(start_routine == NULL && arg == NULL){
-		//init thread
-		TCB* init_thread = new TCB(1, GREEN, NULL, NULL, RUNNING);
-		currentTCB->tid = 1;
-		currentTCB->tcb = init_thread;
-
-	}
-
 	// Create a new thread and add it to the ready queue
 	int current_tid = uthread_self();
-	TCB *new_thread = new TCB(TODO, stub, arg, READY);
+	TCB *new_thread = new TCB(1 /*What should the TID be???*/,GREEN, *(void* (*)(void*)) stub, arg, READY);
 	addToReadyQueue(new_thread);
 	return new_thread->getId();
 }
@@ -212,11 +221,20 @@ int uthread_join(int tid, void **retval)
 
 int uthread_yield(void)
 {
-	// Save context
+	finished_queue_entry finishedTCB;
+	disableInterrupts();
 	
-	// Set state to READY
-
-	// Start executing next thread ??????
+	addToReadyQueue(currentTCB->tcb);
+	currentTCB->tcb->setState(READY);
+	switchThreads();
+	
+	while (!finished_queue.empty())
+	{
+		finishedTCB = finished_queue.front();
+		finished_queue.pop_front();
+		delete &finishedTCB;
+	}
+	enableInterrupts();
 }
 
 void uthread_exit(void *retval)

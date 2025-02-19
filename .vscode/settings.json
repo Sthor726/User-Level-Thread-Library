@@ -65,7 +65,10 @@
         "format": "cpp",
         "system_error": "cpp",
         "type_traits": "cpp",
-        "algorithm": "cpp"
+        "algorithm": "cpp",
+        "span": "cpp",
+        "forward_list": "cpp",
+        "list": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

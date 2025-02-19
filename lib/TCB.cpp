@@ -24,7 +24,7 @@ TCB::TCB(int tid, Priority pr, void *(*start_routine)(void *arg), void *arg, Sta
     _context.uc_stack.ss_sp = _stack;
     _context.uc_stack.ss_size = STACK_SIZE;
     _context.uc_stack.ss_flags = 0;
-    makecontext(&_context, start_routine, arg);
+    makecontext(&_context, (void (*) (void)) start_routine, 1, arg);
 }
 
 TCB::~TCB()
@@ -50,7 +50,7 @@ int TCB::getId() const
 
 void TCB::increaseQuantum()
 {
-    //TODO
+    _quantum++;
 }
 
 int TCB::getQuantum() const
